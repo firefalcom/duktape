@@ -21,13 +21,14 @@ DUK_INTERNAL void duk_hobject_pc2line_pack(duk_hthread *thr, duk_compiler_instr 
 	duk_uint_fast32_t num_header_entries;
 	duk_uint_fast32_t curr_offset;
 	duk_int_fast32_t curr_line, next_line, diff_line;
+	duk_int_fast32_t curr_column, next_column, diff_column;
 	duk_uint_fast32_t curr_pc;
 	duk_uint_fast32_t hdr_index;
 
 	DUK_ASSERT(length <= DUK_COMPILER_MAX_BYTECODE_LENGTH);
 
 	num_header_entries = (length + DUK_PC2LINE_SKIP - 1) / DUK_PC2LINE_SKIP;
-	curr_offset = (duk_uint_fast32_t) (sizeof(duk_uint32_t) + num_header_entries * sizeof(duk_uint32_t) * 2);
+	curr_offset = (duk_uint_fast32_t) (sizeof(duk_uint32_t) + num_header_entries * sizeof(duk_uint32_t) * 3);
 
 	duk_push_dynamic_buffer(thr, (duk_size_t) curr_offset);
 	h_buf = (duk_hbuffer_dynamic *) duk_known_hbuffer(thr, -1);
@@ -45,10 +46,12 @@ DUK_INTERNAL void duk_hobject_pc2line_pack(duk_hthread *thr, duk_compiler_instr 
 		hdr = (duk_uint32_t *) DUK_HBUFFER_DYNAMIC_GET_DATA_PTR(thr->heap, h_buf);
 		DUK_ASSERT(hdr != NULL);
 		DUK_ASSERT(curr_pc < length);
-		hdr_index = 1 + (curr_pc / DUK_PC2LINE_SKIP) * 2;
+		hdr_index = 1 + (curr_pc / DUK_PC2LINE_SKIP) * 3;
 		curr_line = (duk_int_fast32_t) instrs[curr_pc].line;
+		curr_column = (duk_int_fast32_t) instrs[curr_pc].column;
 		hdr[hdr_index + 0] = (duk_uint32_t) curr_line;
 		hdr[hdr_index + 1] = (duk_uint32_t) curr_offset;
+		hdr[hdr_index + 2] = (duk_uint32_t) curr_column;
 
 #if 0
 		DUK_DDD(DUK_DDDPRINT("hdr[%ld]: pc=%ld line=%ld offset=%ld",
@@ -70,7 +73,9 @@ DUK_INTERNAL void duk_hobject_pc2line_pack(duk_hthread *thr, duk_compiler_instr 
 			}
 			DUK_ASSERT(curr_pc < length);
 			next_line = (duk_int32_t) instrs[curr_pc].line;
+			next_column = (duk_int32_t) instrs[curr_pc].column;
 			diff_line = next_line - curr_line;
+			diff_column = next_column - curr_column;
 
 #if 0
 			DUK_DDD(DUK_DDDPRINT("curr_line=%ld, next_line=%ld -> diff_line=%ld",
@@ -95,7 +100,26 @@ DUK_INTERNAL void duk_hobject_pc2line_pack(duk_hthread *thr, duk_compiler_instr 
 				duk_be_encode(be_ctx, (duk_uint32_t) (next_line & 0xffff), 16);
 			}
 
+			if (diff_column == 0) {
+				/* 0 */
+				duk_be_encode(be_ctx, 0, 1);
+			} else if (diff_column >= 1 && diff_column <= 4) {
+				/* 1 0 <2 bits> */
+				duk_be_encode(be_ctx, (duk_uint32_t) ((0x02 << 2) + (diff_column - 1)), 4);
+			} else if (diff_column >= -0x80 && diff_column <= 0x7f) {
+				/* 1 1 0 <8 bits> */
+				DUK_ASSERT(diff_column + 0x80 >= 0 && diff_column + 0x80 <= 0xff);
+				duk_be_encode(be_ctx, (duk_uint32_t) ((0x06 << 8) + (diff_column + 0x80)), 11);
+			} else {
+				/* 1 1 1 <32 bits>
+				 * Encode in two parts to avoid bitencode 24-bit limitation
+				 */
+				duk_be_encode(be_ctx, (duk_uint32_t) ((0x07 << 16) + ((next_column >> 16) & 0xffff)), 19);
+				duk_be_encode(be_ctx, (duk_uint32_t) (next_column & 0xffff), 16);
+			}
+
 			curr_line = next_line;
+			curr_column = next_column;
 		}
 
 		duk_be_finish(be_ctx);

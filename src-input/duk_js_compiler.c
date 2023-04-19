@@ -1149,6 +1149,7 @@ DUK_LOCAL duk_compiler_instr *duk__get_instr_ptr(duk_compiler_ctx *comp_ctx, duk
 DUK_LOCAL void duk__emit(duk_compiler_ctx *comp_ctx, duk_instr_t ins) {
 #if defined(DUK_USE_PC2LINE)
 	duk_int_t line;
+	duk_int_t column;
 #endif
 	duk_compiler_instr *instr;
 
@@ -1175,14 +1176,19 @@ DUK_LOCAL void duk__emit(duk_compiler_ctx *comp_ctx, duk_instr_t ins) {
 	 */
 	/* approximation, close enough */
 	line = comp_ctx->prev_token.start_line;
+	column = comp_ctx->prev_token.start_column;
 	if (line == 0) {
 		line = comp_ctx->curr_token.start_line;
+	}
+	if(column == 0){
+		column = comp_ctx->curr_token.start_line;
 	}
 #endif
 
 	instr->ins = ins;
 #if defined(DUK_USE_PC2LINE)
 	instr->line = (duk_uint32_t) line;
+	instr->column = (duk_uint32_t) column;
 #endif
 #if defined(DUK_USE_DEBUGGER_SUPPORT)
 	if (line < comp_ctx->curr_func.min_line) {
@@ -1718,6 +1724,7 @@ DUK_LOCAL duk_int_t duk__emit_jump_empty(duk_compiler_ctx *comp_ctx) {
 DUK_LOCAL void duk__insert_jump_entry(duk_compiler_ctx *comp_ctx, duk_int_t jump_pc) {
 #if defined(DUK_USE_PC2LINE)
 	duk_int_t line;
+	duk_int_t column;
 #endif
 	duk_compiler_instr *instr;
 	duk_size_t offset;
@@ -1729,10 +1736,12 @@ DUK_LOCAL void duk__insert_jump_entry(duk_compiler_ctx *comp_ctx, duk_int_t jump
 
 #if defined(DUK_USE_PC2LINE)
 	line = comp_ctx->curr_token.start_line; /* approximation, close enough */
+	column = comp_ctx->curr_token.start_column;
 #endif
 	instr->ins = DUK_ENC_OP_ABC(DUK_OP_JUMP, 0);
 #if defined(DUK_USE_PC2LINE)
 	instr->line = (duk_uint32_t) line;
+	instr->column = (duk_uint32_t) column;
 #endif
 
 	DUK_BW_ADD_PTR(comp_ctx->thr, &comp_ctx->curr_func.bw_code, sizeof(duk_compiler_instr));
