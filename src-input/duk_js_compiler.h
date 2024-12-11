@@ -74,6 +74,7 @@ struct duk_compiler_instr {
 	duk_instr_t ins;
 #if defined(DUK_USE_PC2LINE)
 	duk_uint32_t line;
+	duk_uint32_t column;
 #endif
 };
 

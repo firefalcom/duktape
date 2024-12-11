@@ -359,6 +359,7 @@ struct duk_token {
 	duk_hstring *str2; /* string 2 of token (borrowed, stored to ctx->slot2_idx) */
 	duk_size_t start_offset; /* start byte offset of token in lexer input */
 	duk_int_t start_line; /* start line of token (first char) */
+	duk_int_t start_column; /* start column of token (first char) */
 	duk_int_t num_escapes; /* number of escapes and line continuations (for directive prologue) */
 	duk_bool_t lineterm; /* token was preceded by a lineterm */
 	duk_bool_t allow_auto_semi; /* token allows automatic semicolon insertion (eof or preceded by newline) */
@@ -386,6 +387,7 @@ struct duk_lexer_codepoint {
 	duk_codepoint_t codepoint;
 	duk_size_t offset;
 	duk_int_t line;
+	duk_int_t column;
 };
 
 /* Lexer context.  Same context is used for ECMAScript and Regexp parsing. */
@@ -403,6 +405,7 @@ struct duk_lexer_ctx {
 	duk_size_t input_length; /* input byte length */
 	duk_size_t input_offset; /* input offset for window leading edge (not window[0]) */
 	duk_int_t input_line; /* input linenumber at input_offset (not window[0]), init to 1 */
+	duk_int_t input_column; /* input columnnumber at input_offset (not window[0]), init to 1 */
 
 	duk_idx_t slot1_idx; /* valstack slot for 1st token value */
 	duk_idx_t slot2_idx; /* valstack slot for 2nd token value */

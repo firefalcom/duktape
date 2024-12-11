@@ -184,9 +184,11 @@ DUK_LOCAL void duk__fill_lexer_buffer(duk_lexer_ctx *lex_ctx, duk_small_uint_t s
 	duk_ucodepoint_t mincp;
 #endif
 	duk_int_t input_line;
+	duk_int_t input_column;
 
 	/* Use temporaries and update lex_ctx only when finished. */
 	input_line = lex_ctx->input_line;
+	input_column = lex_ctx->input_column;
 	p = lex_ctx->input + lex_ctx->input_offset;
 	p_end = lex_ctx->input + lex_ctx->input_length;
 
@@ -196,6 +198,7 @@ DUK_LOCAL void duk__fill_lexer_buffer(duk_lexer_ctx *lex_ctx, duk_small_uint_t s
 	for (; cp != cp_end; cp++) {
 		cp->offset = (duk_size_t) (p - lex_ctx->input);
 		cp->line = input_line;
+		cp->column = input_column;
 
 		/* XXX: potential issue with signed pointers, p_end < p. */
 		if (DUK_UNLIKELY(p >= p_end)) {
@@ -209,6 +212,7 @@ DUK_LOCAL void duk__fill_lexer_buffer(duk_lexer_ctx *lex_ctx, duk_small_uint_t s
 		}
 
 		x = (duk_ucodepoint_t) (*p++);
+		++input_column;
 
 		/* Fast path. */
 
@@ -228,6 +232,7 @@ DUK_LOCAL void duk__fill_lexer_buffer(duk_lexer_ctx *lex_ctx, duk_small_uint_t s
 					 * the line number.
 					 */
 					input_line++;
+					input_column = 1;
 				}
 			}
 
@@ -297,6 +302,7 @@ DUK_LOCAL void duk__fill_lexer_buffer(duk_lexer_ctx *lex_ctx, duk_small_uint_t s
 		DUK_ASSERT(x != 0x000aUL && x != 0x000dUL);
 		if ((x == 0x2028UL) || (x == 0x2029UL)) {
 			input_line++;
+			input_column = 1;
 		}
 
 		cp->codepoint = (duk_codepoint_t) x;
@@ -304,6 +310,7 @@ DUK_LOCAL void duk__fill_lexer_buffer(duk_lexer_ctx *lex_ctx, duk_small_uint_t s
 
 	lex_ctx->input_offset = (duk_size_t) (p - lex_ctx->input);
 	lex_ctx->input_line = input_line;
+	lex_ctx->input_column = input_column;
 	return;
 
 error_clipped: /* clipped codepoint */
@@ -1080,6 +1087,7 @@ void duk_lexer_parse_js_input_element(duk_lexer_ctx *lex_ctx,
 
 restart_lineupdate:
 	out_token->start_line = lex_ctx->window[0].line;
+	out_token->start_column = lex_ctx->window[0].column;
 
 restart:
 	out_token->start_offset = lex_ctx->window[0].offset;
